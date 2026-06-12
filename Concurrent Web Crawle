@@ -1,0 +1,105 @@
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.util.Set;
+import java.util.concurrent.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class ConcurrentWebCrawler {
+
+    private final ExecutorService executor;
+    private final Set<String> visited;
+    private final int maxPages;
+
+    public ConcurrentWebCrawler(int threads, int maxPages) {
+        this.executor = Executors.newFixedThreadPool(threads);
+        this.visited = ConcurrentHashMap.newKeySet();
+        this.maxPages = maxPages;
+    }
+
+    public void crawl(String startUrl) {
+        submitTask(startUrl);
+
+        executor.shutdown();
+
+        try {
+            executor.awaitTermination(10, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void submitTask(String url) {
+        if (visited.size() >= maxPages)
+            return;
+
+        if (!visited.add(url))
+            return;
+
+        executor.submit(() -> {
+            System.out.println("Crawling: " + url);
+
+            try {
+                String html = fetchPage(url);
+
+                for (String link : extractLinks(html)) {
+                    if (visited.size() < maxPages) {
+                        submitTask(link);
+                    }
+                }
+
+            } catch (Exception e) {
+                System.out.println("Failed: " + url);
+            }
+        });
+    }
+
+    private String fetchPage(String urlString) throws Exception {
+
+        StringBuilder content = new StringBuilder();
+
+        URL url = new URL(urlString);
+
+        try (BufferedReader br =
+                 new BufferedReader(
+                     new InputStreamReader(
+                         url.openStream()))) {
+
+            String line;
+
+            while ((line = br.readLine()) != null) {
+                content.append(line);
+            }
+        }
+
+        return content.toString();
+    }
+
+    private Set<String> extractLinks(String html) {
+
+        Set<String> links =
+            ConcurrentHashMap.newKeySet();
+
+        Pattern pattern =
+            Pattern.compile(
+                "href=[\"'](http[^\"']+)[\"']");
+
+        Matcher matcher =
+            pattern.matcher(html);
+
+        while (matcher.find()) {
+            links.add(matcher.group(1));
+        }
+
+        return links;
+    }
+
+    public static void main(String[] args) {
+
+        ConcurrentWebCrawler crawler =
+            new ConcurrentWebCrawler(10, 100);
+
+        crawler.crawl("https://example.com");
+    }
+}
