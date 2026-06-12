@@ -1,0 +1,59 @@
+import java.util.*;
+
+class Edge {
+    int vertex;
+    int weight;
+
+    Edge(int v, int w) {
+        vertex = v;
+        weight = w;
+    }
+}
+
+public class Dijkstra {
+
+    public static void shortestPath(
+            List<List<Edge>> graph,
+            int source) {
+
+        int n = graph.size();
+
+        int[] dist = new int[n];
+
+        Arrays.fill(dist, Integer.MAX_VALUE);
+
+        dist[source] = 0;
+
+        PriorityQueue<Edge> pq =
+            new PriorityQueue<>(
+                Comparator.comparingInt(e -> e.weight));
+
+        pq.add(new Edge(source, 0));
+
+        while (!pq.isEmpty()) {
+
+            Edge current = pq.poll();
+
+            for (Edge edge :
+                    graph.get(current.vertex)) {
+
+                int newDist =
+                    dist[current.vertex] +
+                    edge.weight;
+
+                if (newDist < dist[edge.vertex]) {
+
+                    dist[edge.vertex] = newDist;
+
+                    pq.add(
+                        new Edge(
+                            edge.vertex,
+                            newDist));
+                }
+            }
+        }
+
+        System.out.println(
+            Arrays.toString(dist));
+    }
+}
