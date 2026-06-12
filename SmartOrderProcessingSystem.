@@ -1,0 +1,100 @@
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+// Represents an Order
+class Order {
+    private static final AtomicInteger COUNTER = new AtomicInteger(0);
+    private final int orderId;
+    private final String product;
+    private final int quantity;
+
+    public Order(String product, int quantity) {
+        this.orderId = COUNTER.incrementAndGet();
+        this.product = product;
+        this.quantity = quantity;
+    }
+
+    public int getOrderId() {
+        return orderId;
+    }
+
+    public String toString() {
+        return "OrderID: " + orderId + ", Product: " + product + ", Qty: " + quantity;
+    }
+}
+
+// Producer: generates orders
+class OrderProducer implements Runnable {
+    private final BlockingQueue<Order> queue;
+
+    public OrderProducer(BlockingQueue<Order> queue) {
+        this.queue = queue;
+    }
+
+    @Override
+    public void run() {
+        try {
+            String[] products = {"Laptop", "Phone", "Tablet", "Headphones"};
+
+            for (int i = 0; i < 10; i++) {
+                Order order = new Order(
+                        products[ThreadLocalRandom.current().nextInt(products.length)],
+                        ThreadLocalRandom.current().nextInt(1, 5)
+                );
+
+                queue.put(order);
+                System.out.println("Produced: " + order);
+
+                Thread.sleep(300);
+            }
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+
+// Consumer: processes orders
+class OrderConsumer implements Runnable {
+    private final BlockingQueue<Order> queue;
+
+    public OrderConsumer(BlockingQueue<Order> queue) {
+        this.queue = queue;
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                Order order = queue.take();
+                System.out.println("Processed: " + order);
+
+                Thread.sleep(500);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+
+// Main system
+public class SmartOrderProcessingSystem {
+
+    public static void main(String[] args) {
+        BlockingQueue<Order> queue = new LinkedBlockingQueue<>(5);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        executor.execute(new OrderProducer(queue));
+        executor.execute(new OrderConsumer(queue));
+
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        executor.shutdownNow();
+        System.out.println("System shutdown completed.");
+    }
+}
