@@ -1,0 +1,62 @@
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+public class ConcurrentTaskProcessor<T, R> {
+
+    private final ExecutorService executor;
+
+    public ConcurrentTaskProcessor(int threadPoolSize) {
+        this.executor = Executors.newFixedThreadPool(threadPoolSize);
+    }
+
+    public List<R> processTasks(List<T> inputs, Function<T, R> processor)
+            throws InterruptedException, ExecutionException {
+
+        List<CompletableFuture<R>> futures = inputs.stream()
+                .map(input -> CompletableFuture.supplyAsync(
+                        () -> processor.apply(input), executor))
+                .collect(Collectors.toList());
+
+        CompletableFuture<Void> allTasks =
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+
+        allTasks.get();
+
+        return futures.stream()
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList());
+    }
+
+    public void shutdown() {
+        executor.shutdown();
+    }
+
+    public static void main(String[] args) {
+        ConcurrentTaskProcessor<Integer, String> processor =
+                new ConcurrentTaskProcessor<>(4);
+
+        List<Integer> numbers = Arrays.asList(5, 10, 15, 20);
+
+        try {
+            List<String> results = processor.processTasks(
+                    numbers,
+                    n -> {
+                        long factorial = 1;
+                        for (int i = 2; i <= n; i++) {
+                            factorial *= i;
+                        }
+                        return "Factorial of " + n + " = " + factorial;
+                    });
+
+            System.out.println("Processing Results:");
+            results.forEach(System.out::println);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            processor.shutdown();
+        }
+    }
+}
